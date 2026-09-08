@@ -1,0 +1,69 @@
+name: KandyKane
+
+options:
+  bundleIdPrefix: kandykane
+  deploymentTarget:
+    iOS: "16.0"
+  createIntermediateGroups: true
+
+settings:
+  base:
+    MARKETING_VERSION: "1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    SWIFT_VERSION: "5.9"
+    CODE_SIGN_STYLE: Manual
+
+targets:
+  KandyKane:
+    type: application
+    platform: iOS
+    sources:
+      - path: KandyKaneApp.swift
+      - path: KandyKaneConfig.swift
+      - path: FrameBridge.swift
+      - path: ClaudeClient.swift
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: kandykane.com
+        PROVISIONING_PROFILE_SPECIFIER: kandykane
+        CODE_SIGN_IDENTITY: "Apple Distribution"
+        INFOPLIST_KEY_CFBundleDisplayName: KandyKane
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+    entitlements:
+      path: KandyKane.entitlements
+      properties:
+        com.apple.security.application-groups:
+          - group.kandykane
+    dependencies:
+      - target: KandyKaneBroadcast
+        embed: true
+
+  KandyKaneBroadcast:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: SampleHandler.swift
+      - path: KandyKaneConfig.swift
+      - path: FrameBridge.swift
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: kandykane.broadcast
+        PROVISIONING_PROFILE_SPECIFIER: kandykane.broadcast
+        CODE_SIGN_IDENTITY: "Apple Distribution"
+        INFOPLIST_KEY_CFBundleDisplayName: KandyKane Broadcast
+        INFOPLIST_KEY_NSExtension_NSExtensionPointIdentifier: com.apple.broadcast-services-upload
+        INFOPLIST_KEY_NSExtension_NSExtensionPrincipalClass: SampleHandler
+        INFOPLIST_KEY_RPBroadcastProcessMode: RPBroadcastProcessModeSampleBuffer
+    entitlements:
+      path: KandyKaneBroadcast.entitlements
+      properties:
+        com.apple.security.application-groups:
+          - group.kandykane
+
+schemes:
+  KandyKane:
+    build:
+      targets:
+        KandyKane: all
+    archive:
+      config: Release
