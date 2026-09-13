@@ -1,0 +1,4 @@
+build/
+*.xcodeproj/
+ExportOptions.plist
+.DS_Store

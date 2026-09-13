@@ -14,6 +14,12 @@ jobs:
       - name: Check out the code
         uses: actions/checkout@v4
 
+      - name: Select Xcode
+        run: |
+          ls /Applications | grep -i '^Xcode'
+          sudo xcode-select -s "$(ls -d /Applications/Xcode*.app | sort -V | tail -n1)"
+          xcodebuild -version
+
       - name: Install XcodeGen
         run: brew install xcodegen
 
@@ -75,7 +81,7 @@ jobs:
             <dict>
               <key>kandykane.com</key>
               <string>kandykane</string>
-              <key>kandykane.broadcast</key>
+              <key>kandykane.com.broadcast</key>
               <string>kandykane.broadcast</string>
             </dict>
           </dict>

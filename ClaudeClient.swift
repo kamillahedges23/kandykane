@@ -26,7 +26,7 @@ enum ClaudeError: LocalizedError {
 actor ClaudeClient {
 
     private let endpoint = URL(string: "https://api.anthropic.com/v1/messages")!
-    private let model = "claude-sonnet-4-6"
+    private let model = "claude-opus-5"
 
     private let systemPrompt = """
     You look at a screenshot and decide whether a question, problem, or \
@@ -58,7 +58,8 @@ actor ClaudeClient {
 
         let body: [String: Any] = [
             "model": model,
-            "max_tokens": 400,
+            "max_tokens": 2000,
+            "output_config": ["effort": "low"],
             "system": systemPrompt,
             "messages": [[
                 "role": "user",
