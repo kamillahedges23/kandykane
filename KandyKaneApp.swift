@@ -50,7 +50,7 @@ struct ContentView: View {
                 }
             }
         }
-        .onChange(of: apiKey) { _, newValue in
+        .onChange(of: apiKey) { newValue in
             KandyKaneConfig.sharedDefaults?.set(
                 newValue,
                 forKey: KandyKaneConfig.apiKeyDefaultsKey
