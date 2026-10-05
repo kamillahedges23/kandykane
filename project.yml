@@ -11,7 +11,9 @@ settings:
     MARKETING_VERSION: "1.0"
     CURRENT_PROJECT_VERSION: "1"
     SWIFT_VERSION: "5.9"
+    TARGETED_DEVICE_FAMILY: "1"
     CODE_SIGN_STYLE: Manual
+    CODE_SIGN_IDENTITY: "Apple Distribution"
 
 targets:
   KandyKane:
@@ -22,15 +24,25 @@ targets:
       - path: KandyKaneConfig.swift
       - path: FrameBridge.swift
       - path: ClaudeClient.swift
+      - path: Assets.xcassets
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: kandykane.com
+        # Replaced by CI with the name inside the installed profile.
         PROVISIONING_PROFILE_SPECIFIER: kandykane
-        CODE_SIGN_IDENTITY: "Apple Distribution"
-        INFOPLIST_KEY_CFBundleDisplayName: KandyKane
-        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+    info:
+      path: Generated/KandyKane-Info.plist
+      properties:
+        CFBundleDisplayName: KandyKane
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        UILaunchScreen: {}
+        ITSAppUsesNonExemptEncryption: false
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
     entitlements:
-      path: KandyKane.entitlements
+      path: Generated/KandyKane.entitlements
       properties:
         com.apple.security.application-groups:
           - group.kandykane
@@ -48,14 +60,21 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: kandykane.broadcast
+        # Replaced by CI with the name inside the installed profile.
         PROVISIONING_PROFILE_SPECIFIER: kandykane.broadcast
-        CODE_SIGN_IDENTITY: "Apple Distribution"
-        INFOPLIST_KEY_CFBundleDisplayName: KandyKane Broadcast
-        INFOPLIST_KEY_NSExtension_NSExtensionPointIdentifier: com.apple.broadcast-services-upload
-        INFOPLIST_KEY_NSExtension_NSExtensionPrincipalClass: SampleHandler
-        INFOPLIST_KEY_RPBroadcastProcessMode: RPBroadcastProcessModeSampleBuffer
+    info:
+      path: Generated/KandyKaneBroadcast-Info.plist
+      properties:
+        CFBundleDisplayName: KandyKane Broadcast
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.broadcast-services-upload
+          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).SampleHandler
+          NSExtensionAttributes:
+            RPBroadcastProcessMode: RPBroadcastProcessModeSampleBuffer
     entitlements:
-      path: KandyKaneBroadcast.entitlements
+      path: Generated/KandyKaneBroadcast.entitlements
       properties:
         com.apple.security.application-groups:
           - group.kandykane
