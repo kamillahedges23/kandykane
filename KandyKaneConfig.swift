@@ -5,6 +5,8 @@ enum KandyKaneConfig {
     static let appGroup = "group.kandykane"
     static let frameFilename = "latest-frame.jpg"
     static let liveMarkerFilename = "broadcast-live"
+    static let appVisibleMarkerFilename = "app-visible"
+    static let sessionFilename = "session.json"
     // How often the extension writes a frame for the live preview.
     static let previewInterval: TimeInterval = 1.0
     // Minimum time between screenshots sent to Claude.
@@ -29,5 +31,13 @@ enum KandyKaneConfig {
 
     static var liveMarkerURL: URL? {
         sharedContainerURL?.appendingPathComponent(liveMarkerFilename)
+    }
+
+    static var appVisibleMarkerURL: URL? {
+        sharedContainerURL?.appendingPathComponent(appVisibleMarkerFilename)
+    }
+
+    static var sessionURL: URL? {
+        sharedContainerURL?.appendingPathComponent(sessionFilename)
     }
 }

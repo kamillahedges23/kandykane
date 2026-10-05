@@ -1,6 +1,5 @@
 import SwiftUI
 import ReplayKit
-import AVFoundation
 
 @main
 struct KandyKaneApp: App {
@@ -13,7 +12,8 @@ struct KandyKaneApp: App {
 
 struct ContentView: View {
 
-    @StateObject private var engine = ScanEngine()
+    @StateObject private var engine = SessionMonitor()
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
         ZStack {
@@ -53,8 +53,14 @@ struct ContentView: View {
                 }
             }
         }
-        .onAppear { engine.start() }
+        .onAppear {
+            engine.appActive = scenePhase == .active
+            engine.start()
+        }
         .onDisappear { engine.stop() }
+        .onChange(of: scenePhase) { phase in
+            engine.appActive = phase == .active
+        }
     }
 
     // The most recent captured frame, like a shared screen on a video call.
@@ -127,13 +133,16 @@ struct BroadcastButton: UIViewRepresentable {
 }
 
 struct LogEntry: Identifiable {
-    let id = UUID()
+    let id: Int
     let question: String
     let answer: String
 }
 
+// Shows what the broadcast extension is doing. The extension does the
+// scanning and speaking, because iOS suspends this app while another app is
+// on screen.
 @MainActor
-final class ScanEngine: NSObject, ObservableObject, AVSpeechSynthesizerDelegate {
+final class SessionMonitor: ObservableObject {
 
     @Published var status = "Waiting for a screen share"
     @Published var errorMessage: String?
@@ -141,25 +150,19 @@ final class ScanEngine: NSObject, ObservableObject, AVSpeechSynthesizerDelegate 
     @Published var preview: UIImage?
     @Published var isLive = false
 
-    private let client = ClaudeClient()
-    private let synth = AVSpeechSynthesizer()
-    private var timer: Timer?
-    private var lastFrameStamp: TimeInterval = 0
-    private var lastAnalysis = Date.distantPast
-    private var lastQuestion = ""
-    private var busy = false
-    private var speaking = false
-
-    override init() {
-        super.init()
-        synth.delegate = self
+    // While KandyKane is on screen the extension would only see this app, so
+    // it pauses scanning.
+    var appActive = false {
+        didSet { FrameBridge.setAppVisible(appActive) }
     }
 
+    private var timer: Timer?
+    private var lastFrameStamp: TimeInterval = 0
+
     func start() {
-        configureAudio()
         timer?.invalidate()
         timer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
-            Task { await self?.tick() }
+            Task { await self?.refresh() }
         }
     }
 
@@ -168,98 +171,40 @@ final class ScanEngine: NSObject, ObservableObject, AVSpeechSynthesizerDelegate 
         timer = nil
     }
 
-    private func configureAudio() {
-        try? AVAudioSession.sharedInstance().setCategory(
-            .playback,
-            mode: .spokenAudio,
-            options: [.duckOthers]
-        )
-        try? AVAudioSession.sharedInstance().setActive(true)
-    }
+    private func refresh() {
+        if appActive {
+            FrameBridge.setAppVisible(true)
+        }
 
-    private func tick() async {
         let live = FrameBridge.isLive
         if live != isLive {
             isLive = live
-            if live {
-                // A new broadcast starts a new session.
-                log = []
-                lastQuestion = ""
-                errorMessage = nil
-                status = "Watching"
-            } else {
+            if !live {
                 preview = nil
                 lastFrameStamp = 0
                 status = "Waiting for a screen share"
+                errorMessage = nil
             }
         }
         guard live else { return }
 
         // Capture the timestamp before reading, so a frame written in between
-        // is picked up on the next tick instead of being marked as seen.
+        // is picked up on the next refresh instead of being marked as seen.
         let frameStamp = FrameBridge.latestTimestamp
-        guard frameStamp > lastFrameStamp, let frame = FrameBridge.readLatest() else { return }
-        lastFrameStamp = frameStamp
-        if let image = UIImage(data: frame) {
-            preview = image
-        }
-
-        // Let an answer finish before looking for the next question.
-        guard !busy, !speaking,
-              Date().timeIntervalSince(lastAnalysis) >= KandyKaneConfig.analysisInterval else {
-            return
-        }
-        await analyze(frame)
-    }
-
-    private func analyze(_ frame: Data) async {
-        busy = true
-        defer { busy = false }
-        lastAnalysis = Date()
-        status = "Scanning"
-        errorMessage = nil
-
-        do {
-            let result = try await client.analyze(frame: frame, previousQuestion: lastQuestion)
-            guard isLive else { return }
-
-            if result.hasQuestion, !result.answer.isEmpty, result.question != lastQuestion {
-                lastQuestion = result.question
-                log.insert(
-                    LogEntry(question: result.question, answer: result.answer),
-                    at: 0
-                )
-                speak(result.answer)
-            } else {
-                status = "Watching"
+        if frameStamp > lastFrameStamp, let frame = FrameBridge.readLatest() {
+            lastFrameStamp = frameStamp
+            if let image = UIImage(data: frame) {
+                preview = image
             }
-        } catch {
-            errorMessage = error.localizedDescription
-            status = isLive ? "Watching" : "Waiting for a screen share"
         }
-    }
 
-    private func speak(_ text: String) {
-        guard !text.isEmpty else { return }
-        speaking = true
-        status = "Speaking"
-
-        let utterance = AVSpeechUtterance(string: text)
-        utterance.rate = AVSpeechUtteranceDefaultSpeechRate
-        utterance.voice = AVSpeechSynthesisVoice(language: "en-US")
-        synth.speak(utterance)
-    }
-
-    private func finishedSpeaking() {
-        speaking = false
-        status = isLive ? "Watching" : "Waiting for a screen share"
-    }
-
-    nonisolated func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didFinish utterance: AVSpeechUtterance) {
-        Task { @MainActor in self.finishedSpeaking() }
-    }
-
-    nonisolated func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didCancel utterance: AVSpeechUtterance) {
-        Task { @MainActor in self.finishedSpeaking() }
+        guard let session = SessionState.read() else { return }
+        status = session.status
+        errorMessage = session.error
+        if session.answers.count != log.count {
+            log = session.answers.enumerated().reversed().map { index, entry in
+                LogEntry(id: index, question: entry.question, answer: entry.answer)
+            }
+        }
     }
 }

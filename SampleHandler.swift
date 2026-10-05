@@ -6,17 +6,22 @@ class SampleHandler: RPBroadcastSampleHandler {
 
     private let context = CIContext()
     private var lastCapture = Date.distantPast
+    private var scanner: BroadcastScanner?
 
     override func broadcastStarted(withSetupInfo setupInfo: [String: NSObject]?) {
         FrameBridge.clear()
-        FrameBridge.setLive(true)
+        SessionState.clear()
         lastCapture = Date.distantPast
+        scanner = BroadcastScanner()
+        FrameBridge.setLive(true)
     }
 
     override func broadcastPaused() {}
     override func broadcastResumed() {}
 
     override func broadcastFinished() {
+        scanner?.stop()
+        scanner = nil
         FrameBridge.setLive(false)
         FrameBridge.clear()
     }
@@ -39,6 +44,7 @@ class SampleHandler: RPBroadcastSampleHandler {
 
         if let jpeg = makeJPEG(from: pixelBuffer) {
             FrameBridge.write(jpeg)
+            scanner?.offer(jpeg)
         }
     }
 

@@ -48,16 +48,73 @@ enum FrameBridge {
     // timestamps can't tell the app whether a broadcast is running. The
     // extension keeps a marker file for that instead.
     static func setLive(_ live: Bool) {
-        guard let url = KandyKaneConfig.liveMarkerURL else { return }
-        if live {
+        setMarker(KandyKaneConfig.liveMarkerURL, live)
+    }
+
+    static var isLive: Bool {
+        markerExists(KandyKaneConfig.liveMarkerURL)
+    }
+
+    // Refreshed by the app while it's on screen, so the extension doesn't pay
+    // to scan the app's own preview. A stale marker (say, after the app
+    // crashed) is ignored.
+    static func setAppVisible(_ visible: Bool) {
+        setMarker(KandyKaneConfig.appVisibleMarkerURL, visible)
+    }
+
+    static var isAppVisible: Bool {
+        guard let url = KandyKaneConfig.appVisibleMarkerURL,
+              let attrs = try? FileManager.default.attributesOfItem(atPath: url.path),
+              let modified = attrs[.modificationDate] as? Date else {
+            return false
+        }
+        return Date().timeIntervalSince(modified) < 3
+    }
+
+    private static func setMarker(_ url: URL?, _ on: Bool) {
+        guard let url else { return }
+        if on {
             try? Data().write(to: url, options: .atomic)
         } else {
             try? FileManager.default.removeItem(at: url)
         }
     }
 
-    static var isLive: Bool {
-        guard let url = KandyKaneConfig.liveMarkerURL else { return false }
+    private static func markerExists(_ url: URL?) -> Bool {
+        guard let url else { return false }
         return FileManager.default.fileExists(atPath: url.path)
+    }
+}
+
+// What the extension is doing and the answers it has given this broadcast.
+// The extension writes it; the app only reads it.
+struct SessionSnapshot: Codable {
+    struct Answer: Codable {
+        let question: String
+        let answer: String
+    }
+
+    var status = "Watching"
+    var error: String?
+    var answers: [Answer] = []
+}
+
+enum SessionState {
+
+    static func write(_ snapshot: SessionSnapshot) {
+        guard let url = KandyKaneConfig.sessionURL,
+              let data = try? JSONEncoder().encode(snapshot) else { return }
+        try? data.write(to: url, options: .atomic)
+    }
+
+    static func read() -> SessionSnapshot? {
+        guard let url = KandyKaneConfig.sessionURL,
+              let data = try? Data(contentsOf: url) else { return nil }
+        return try? JSONDecoder().decode(SessionSnapshot.self, from: data)
+    }
+
+    static func clear() {
+        guard let url = KandyKaneConfig.sessionURL else { return }
+        try? FileManager.default.removeItem(at: url)
     }
 }

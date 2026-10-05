@@ -24,7 +24,6 @@ targets:
       - path: KandyKaneConfig.swift
       - path: KandyKaneSecrets.swift
       - path: FrameBridge.swift
-      - path: ClaudeClient.swift
       - path: Assets.xcassets
     settings:
       base:
@@ -61,6 +60,8 @@ targets:
     platform: iOS
     sources:
       - path: SampleHandler.swift
+      - path: BroadcastScanner.swift
+      - path: ClaudeClient.swift
       - path: KandyKaneConfig.swift
       - path: KandyKaneSecrets.swift
       - path: FrameBridge.swift
