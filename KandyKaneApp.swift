@@ -14,9 +14,6 @@ struct KandyKaneApp: App {
 struct ContentView: View {
 
     @StateObject private var engine = ScanEngine()
-    @State private var apiKey: String = KandyKaneConfig.sharedDefaults?
-        .string(forKey: KandyKaneConfig.apiKeyDefaultsKey) ?? ""
-    @State private var showKey = false
 
     var body: some View {
         ZStack {
@@ -27,63 +24,51 @@ struct ContentView: View {
                 Text("KandyKane")
                     .font(.system(size: 34, weight: .bold, design: .rounded))
                     .foregroundStyle(.white)
-                    .padding(.top, 40)
+                    .padding(.top, engine.isLive ? 16 : 40)
 
-                Text("Share your screen and it reads questions aloud.")
-                    .font(.subheadline)
-                    .foregroundStyle(.white.opacity(0.6))
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 32)
-
-                keyField
+                if !engine.isLive {
+                    Text("Share your screen and it reads questions aloud.")
+                        .font(.subheadline)
+                        .foregroundStyle(.white.opacity(0.6))
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 32)
+                }
 
                 BroadcastButton()
                     .frame(height: 64)
                     .padding(.horizontal, 24)
 
+                if let preview = engine.preview {
+                    screenPreview(preview)
+                }
+
                 statusPanel
 
-                Spacer()
+                if engine.preview == nil {
+                    Spacer()
+                }
 
                 if !engine.log.isEmpty {
                     answerLog
                 }
             }
         }
-        .onChange(of: apiKey) { newValue in
-            KandyKaneConfig.sharedDefaults?.set(
-                newValue,
-                forKey: KandyKaneConfig.apiKeyDefaultsKey
-            )
-        }
         .onAppear { engine.start() }
         .onDisappear { engine.stop() }
     }
 
-    private var keyField: some View {
-        HStack {
-            Group {
-                if showKey {
-                    TextField("API key", text: $apiKey)
-                } else {
-                    SecureField("API key", text: $apiKey)
-                }
-            }
-            .textInputAutocapitalization(.never)
-            .autocorrectionDisabled()
-            .font(.system(size: 16, design: .monospaced))
-            .foregroundStyle(.white)
-
-            Button {
-                showKey.toggle()
-            } label: {
-                Image(systemName: showKey ? "eye.slash" : "eye")
-                    .foregroundStyle(.white.opacity(0.5))
-            }
-        }
-        .padding(14)
-        .background(Color.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
-        .padding(.horizontal, 24)
+    // The most recent captured frame, like a shared screen on a video call.
+    private func screenPreview(_ image: UIImage) -> some View {
+        Image(uiImage: image)
+            .resizable()
+            .scaledToFit()
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(Color.white.opacity(0.08))
+            )
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .padding(.horizontal, 24)
     }
 
     private var statusPanel: some View {
@@ -91,20 +76,6 @@ struct ContentView: View {
             Text(engine.status)
                 .font(.callout)
                 .foregroundStyle(.white.opacity(0.8))
-
-            if !engine.currentAnswer.isEmpty {
-                Text(engine.currentAnswer)
-                    .font(.body)
-                    .foregroundStyle(.white)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 24)
-
-                Button("Hear it again") {
-                    engine.speak(engine.currentAnswer)
-                }
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(.blue)
-            }
 
             if let error = engine.errorMessage {
                 Text(error)
@@ -162,24 +133,32 @@ struct LogEntry: Identifiable {
 }
 
 @MainActor
-final class ScanEngine: ObservableObject {
+final class ScanEngine: NSObject, ObservableObject, AVSpeechSynthesizerDelegate {
 
     @Published var status = "Waiting for a screen share"
-    @Published var currentAnswer = ""
     @Published var errorMessage: String?
     @Published var log: [LogEntry] = []
+    @Published var preview: UIImage?
+    @Published var isLive = false
 
     private let client = ClaudeClient()
     private let synth = AVSpeechSynthesizer()
     private var timer: Timer?
-    private var lastSeen: TimeInterval = 0
+    private var lastFrameStamp: TimeInterval = 0
+    private var lastAnalysis = Date.distantPast
     private var lastQuestion = ""
     private var busy = false
+    private var speaking = false
+
+    override init() {
+        super.init()
+        synth.delegate = self
+    }
 
     func start() {
         configureAudio()
         timer?.invalidate()
-        timer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
+        timer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
             Task { await self?.tick() }
         }
     }
@@ -199,48 +178,88 @@ final class ScanEngine: ObservableObject {
     }
 
     private func tick() async {
-        guard !busy else { return }
-        guard FrameBridge.hasNewFrame(since: lastSeen) else { return }
+        let live = FrameBridge.isLive
+        if live != isLive {
+            isLive = live
+            if live {
+                // A new broadcast starts a new session.
+                log = []
+                lastQuestion = ""
+                errorMessage = nil
+                status = "Watching"
+            } else {
+                preview = nil
+                lastFrameStamp = 0
+                status = "Waiting for a screen share"
+            }
+        }
+        guard live else { return }
+
         // Capture the timestamp before reading, so a frame written in between
         // is picked up on the next tick instead of being marked as seen.
-        let frameTimestamp = FrameBridge.latestTimestamp
-        guard let frame = FrameBridge.readLatest() else { return }
+        let frameStamp = FrameBridge.latestTimestamp
+        guard frameStamp > lastFrameStamp, let frame = FrameBridge.readLatest() else { return }
+        lastFrameStamp = frameStamp
+        if let image = UIImage(data: frame) {
+            preview = image
+        }
 
+        // Let an answer finish before looking for the next question.
+        guard !busy, !speaking,
+              Date().timeIntervalSince(lastAnalysis) >= KandyKaneConfig.analysisInterval else {
+            return
+        }
+        await analyze(frame)
+    }
+
+    private func analyze(_ frame: Data) async {
         busy = true
-        lastSeen = frameTimestamp
-        status = "Reading the screen"
+        defer { busy = false }
+        lastAnalysis = Date()
+        status = "Scanning"
         errorMessage = nil
 
         do {
-            let result = try await client.analyze(frame: frame)
+            let result = try await client.analyze(frame: frame, previousQuestion: lastQuestion)
+            guard isLive else { return }
 
-            if result.hasQuestion, result.question != lastQuestion {
+            if result.hasQuestion, !result.answer.isEmpty, result.question != lastQuestion {
                 lastQuestion = result.question
-                currentAnswer = result.answer
                 log.insert(
                     LogEntry(question: result.question, answer: result.answer),
                     at: 0
                 )
                 speak(result.answer)
-                status = "Answered"
             } else {
-                status = "Watching for questions"
+                status = "Watching"
             }
         } catch {
             errorMessage = error.localizedDescription
-            status = "Watching for questions"
+            status = isLive ? "Watching" : "Waiting for a screen share"
         }
-
-        busy = false
     }
 
-    func speak(_ text: String) {
+    private func speak(_ text: String) {
         guard !text.isEmpty else { return }
-        synth.stopSpeaking(at: .immediate)
+        speaking = true
+        status = "Speaking"
 
         let utterance = AVSpeechUtterance(string: text)
         utterance.rate = AVSpeechUtteranceDefaultSpeechRate
         utterance.voice = AVSpeechSynthesisVoice(language: "en-US")
         synth.speak(utterance)
+    }
+
+    private func finishedSpeaking() {
+        speaking = false
+        status = isLive ? "Watching" : "Waiting for a screen share"
+    }
+
+    nonisolated func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didFinish utterance: AVSpeechUtterance) {
+        Task { @MainActor in self.finishedSpeaking() }
+    }
+
+    nonisolated func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didCancel utterance: AVSpeechUtterance) {
+        Task { @MainActor in self.finishedSpeaking() }
     }
 }

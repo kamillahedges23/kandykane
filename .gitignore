@@ -13,3 +13,6 @@ xcuserdata/
 *.p12
 *.mobileprovision
 *.cer
+
+# Anthropic API key, compiled into the app (written by CI from a secret)
+KandyKaneSecrets.swift

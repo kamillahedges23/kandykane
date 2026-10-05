@@ -9,6 +9,7 @@ class SampleHandler: RPBroadcastSampleHandler {
 
     override func broadcastStarted(withSetupInfo setupInfo: [String: NSObject]?) {
         FrameBridge.clear()
+        FrameBridge.setLive(true)
         lastCapture = Date.distantPast
     }
 
@@ -16,6 +17,7 @@ class SampleHandler: RPBroadcastSampleHandler {
     override func broadcastResumed() {}
 
     override func broadcastFinished() {
+        FrameBridge.setLive(false)
         FrameBridge.clear()
     }
 
@@ -26,7 +28,7 @@ class SampleHandler: RPBroadcastSampleHandler {
         guard sampleBufferType == .video else { return }
 
         let now = Date()
-        guard now.timeIntervalSince(lastCapture) >= KandyKaneConfig.captureInterval else {
+        guard now.timeIntervalSince(lastCapture) >= KandyKaneConfig.previewInterval else {
             return
         }
         lastCapture = now

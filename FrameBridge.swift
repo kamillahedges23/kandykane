@@ -43,4 +43,21 @@ enum FrameBridge {
         guard let url = KandyKaneConfig.frameURL else { return }
         try? FileManager.default.removeItem(at: url)
     }
+
+    // ReplayKit only delivers frames while the screen changes, so frame
+    // timestamps can't tell the app whether a broadcast is running. The
+    // extension keeps a marker file for that instead.
+    static func setLive(_ live: Bool) {
+        guard let url = KandyKaneConfig.liveMarkerURL else { return }
+        if live {
+            try? Data().write(to: url, options: .atomic)
+        } else {
+            try? FileManager.default.removeItem(at: url)
+        }
+    }
+
+    static var isLive: Bool {
+        guard let url = KandyKaneConfig.liveMarkerURL else { return false }
+        return FileManager.default.fileExists(atPath: url.path)
+    }
 }

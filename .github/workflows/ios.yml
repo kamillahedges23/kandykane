@@ -78,6 +78,18 @@ jobs:
           install_profile "$PROFILE_APP" APP_PROFILE_NAME
           install_profile "$PROFILE_BROADCAST" BROADCAST_PROFILE_NAME
 
+      - name: Write the API key config
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          set -euo pipefail
+          KEY=$(printf '%s' "$ANTHROPIC_API_KEY" | tr -d '[:space:]')
+          if [ -z "$KEY" ]; then
+            echo "::error::The ANTHROPIC_API_KEY secret is not set."
+            exit 1
+          fi
+          printf 'enum KandyKaneSecrets {\n    static let anthropicAPIKey = "%s"\n}\n' "$KEY" > KandyKaneSecrets.swift
+
       - name: Generate the Xcode project
         run: |
           set -euo pipefail
