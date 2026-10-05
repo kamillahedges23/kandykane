@@ -157,9 +157,17 @@ jobs:
           else
             printf '%s' "$ASC_PRIVATE_KEY" | tr -d '[:space:]' | base64 --decode > "$KEY_FILE"
           fi
+          # altool can exit 0 even when Apple rejects the build, so check its output.
+          set +e
           xcrun altool --upload-app \
             --type ios \
             --file "$(ls build/export/*.ipa | head -n1)" \
             --apiKey "$ASC_KEY_ID" \
-            --apiIssuer "$ASC_ISSUER_ID"
+            --apiIssuer "$ASC_ISSUER_ID" 2>&1 | tee "$RUNNER_TEMP/altool.log"
+          set -e
           rm -f "$KEY_FILE"
+          if grep -q "UPLOAD FAILED" "$RUNNER_TEMP/altool.log" || \
+             ! grep -q -E "UPLOAD SUCCEEDED|No errors uploading" "$RUNNER_TEMP/altool.log"; then
+            echo "::error::App Store Connect rejected the upload. See the errors above."
+            exit 1
+          fi
