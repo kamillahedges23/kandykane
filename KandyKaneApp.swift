@@ -143,7 +143,7 @@ struct BroadcastButton: UIViewRepresentable {
         let picker = RPSystemBroadcastPickerView(
             frame: CGRect(x: 0, y: 0, width: 200, height: 64)
         )
-        picker.preferredExtension = "kandykane.broadcast"
+        picker.preferredExtension = "kandykane.com.broadcast"
         picker.showsMicrophoneButton = false
 
         for case let button as UIButton in picker.subviews {

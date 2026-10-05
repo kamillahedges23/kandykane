@@ -59,7 +59,7 @@ targets:
       - path: FrameBridge.swift
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: kandykane.broadcast
+        PRODUCT_BUNDLE_IDENTIFIER: kandykane.com.broadcast
         # Replaced by CI with the name inside the installed profile.
         PROVISIONING_PROFILE_SPECIFIER: kandykane.broadcast
     info:

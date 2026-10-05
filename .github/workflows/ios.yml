@@ -110,7 +110,7 @@ jobs:
             <dict>
               <key>kandykane.com</key>
               <string>${APP_PROFILE_NAME}</string>
-              <key>kandykane.broadcast</key>
+              <key>kandykane.com.broadcast</key>
               <string>${BROADCAST_PROFILE_NAME}</string>
             </dict>
           </dict>
