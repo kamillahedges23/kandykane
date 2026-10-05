@@ -97,6 +97,8 @@ jobs:
             -archivePath build/KandyKane.xcarchive \
             -destination 'generic/platform=iOS' \
             DEVELOPMENT_TEAM="${{ secrets.TEAM_ID }}" \
+            CODE_SIGN_STYLE=Manual \
+            CODE_SIGN_IDENTITY="Apple Distribution" \
             CURRENT_PROJECT_VERSION="${{ github.run_number }}"
 
       - name: Write export options

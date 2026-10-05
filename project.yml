@@ -28,6 +28,9 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: kandykane.com
+        CODE_SIGN_STYLE: Manual
+        CODE_SIGN_IDENTITY: "Apple Distribution"
+        "CODE_SIGN_IDENTITY[sdk=iphoneos*]": "Apple Distribution"
         # Replaced by CI with the name inside the installed profile.
         PROVISIONING_PROFILE_SPECIFIER: kandykane
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
@@ -60,6 +63,9 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: kandykane.broadcast
+        CODE_SIGN_STYLE: Manual
+        CODE_SIGN_IDENTITY: "Apple Distribution"
+        "CODE_SIGN_IDENTITY[sdk=iphoneos*]": "Apple Distribution"
         # Replaced by CI with the name inside the installed profile.
         PROVISIONING_PROFILE_SPECIFIER: kandykane.broadcast
     info:
