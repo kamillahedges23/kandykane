@@ -78,9 +78,13 @@ targets:
         CFBundleDisplayName: KandyKane Broadcast
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        # Workaround for App Store Connect error 90362, which reports this key as
+        # missing even when it's set in NSExtensionAttributes (the documented place).
+        RPBroadcastProcessMode: RPBroadcastProcessModeSampleBuffer
         NSExtension:
           NSExtensionPointIdentifier: com.apple.broadcast-services-upload
           NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).SampleHandler
+          RPBroadcastProcessMode: RPBroadcastProcessModeSampleBuffer
           NSExtensionAttributes:
             RPBroadcastProcessMode: RPBroadcastProcessModeSampleBuffer
     entitlements:
