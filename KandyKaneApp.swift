@@ -143,7 +143,7 @@ struct BroadcastButton: UIViewRepresentable {
         let picker = RPSystemBroadcastPickerView(
             frame: CGRect(x: 0, y: 0, width: 200, height: 64)
         )
-        picker.preferredExtension = "kandykane.broadcast"
+        picker.preferredExtension = "kandykane.com.broadcast"
         picker.showsMicrophoneButton = false
 
         for case let button as UIButton in picker.subviews {
@@ -201,10 +201,13 @@ final class ScanEngine: ObservableObject {
     private func tick() async {
         guard !busy else { return }
         guard FrameBridge.hasNewFrame(since: lastSeen) else { return }
+        // Capture the timestamp before reading, so a frame written in between
+        // is picked up on the next tick instead of being marked as seen.
+        let frameTimestamp = FrameBridge.latestTimestamp
         guard let frame = FrameBridge.readLatest() else { return }
 
         busy = true
-        lastSeen = FrameBridge.latestTimestamp
+        lastSeen = frameTimestamp
         status = "Reading the screen"
         errorMessage = nil
 

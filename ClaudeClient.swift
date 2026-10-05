@@ -8,15 +8,15 @@ struct ClaudeResponse {
 
 enum ClaudeError: LocalizedError {
     case missingKey
-    case badResponse(Int)
+    case badResponse(Int, String?)
     case decodingFailed
 
     var errorDescription: String? {
         switch self {
         case .missingKey:
             return "No API key set. Add it on the main screen."
-        case .badResponse(let code):
-            return "The API returned status \(code)."
+        case .badResponse(let code, let message):
+            return "The API returned status \(code)." + (message.map { " \($0)" } ?? "")
         case .decodingFailed:
             return "Could not read the response."
         }
@@ -26,7 +26,7 @@ enum ClaudeError: LocalizedError {
 actor ClaudeClient {
 
     private let endpoint = URL(string: "https://api.anthropic.com/v1/messages")!
-    private let model = "claude-sonnet-4-6"
+    private let model = "claude-opus-5-5"
 
     private let systemPrompt = """
     You look at a screenshot and decide whether a question, problem, or \
@@ -44,7 +44,8 @@ actor ClaudeClient {
 
     func analyze(frame jpegData: Data) async throws -> ClaudeResponse {
         guard let key = KandyKaneConfig.sharedDefaults?
-            .string(forKey: KandyKaneConfig.apiKeyDefaultsKey),
+            .string(forKey: KandyKaneConfig.apiKeyDefaultsKey)?
+            .trimmingCharacters(in: .whitespacesAndNewlines),
               !key.isEmpty else {
             throw ClaudeError.missingKey
         }
@@ -54,11 +55,16 @@ actor ClaudeClient {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue(key, forHTTPHeaderField: "x-api-key")
         request.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
-        request.timeoutInterval = 30
+        request.setValue("server-side-fallback-2026-07-01", forHTTPHeaderField: "anthropic-beta")
+        request.timeoutInterval = 60
 
         let body: [String: Any] = [
             "model": model,
-            "max_tokens": 400,
+            // Thinking is always on for this model and counts toward
+            // max_tokens, so leave headroom and keep effort low.
+            "max_tokens": 2048,
+            "output_config": ["effort": "low"],
+            "fallbacks": "default",
             "system": systemPrompt,
             "messages": [[
                 "role": "user",
@@ -87,7 +93,9 @@ actor ClaudeClient {
             throw ClaudeError.decodingFailed
         }
         guard (200..<300).contains(http.statusCode) else {
-            throw ClaudeError.badResponse(http.statusCode)
+            let apiError = (try? JSONSerialization.jsonObject(with: data) as? [String: Any])
+                .flatMap { $0["error"] as? [String: Any] }?["message"] as? String
+            throw ClaudeError.badResponse(http.statusCode, apiError)
         }
 
         return try parse(data)
