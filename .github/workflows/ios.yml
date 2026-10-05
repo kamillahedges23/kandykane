@@ -82,7 +82,7 @@ jobs:
         run: |
           set -euo pipefail
           # Point each target at the profile name that was actually installed.
-          sed -i '' "s|PROVISIONING_PROFILE_SPECIFIER: kandykane\.broadcast$|PROVISIONING_PROFILE_SPECIFIER: \"$BROADCAST_PROFILE_NAME\"|" project.yml
+          sed -i '' "s|PROVISIONING_PROFILE_SPECIFIER: kandykane\.com\.broadcast$|PROVISIONING_PROFILE_SPECIFIER: \"$BROADCAST_PROFILE_NAME\"|" project.yml
           sed -i '' "s|PROVISIONING_PROFILE_SPECIFIER: kandykane$|PROVISIONING_PROFILE_SPECIFIER: \"$APP_PROFILE_NAME\"|" project.yml
           grep PROVISIONING_PROFILE_SPECIFIER project.yml
           xcodegen generate
@@ -120,7 +120,7 @@ jobs:
             <dict>
               <key>kandykane.com</key>
               <string>${APP_PROFILE_NAME}</string>
-              <key>kandykane.broadcast</key>
+              <key>kandykane.com.broadcast</key>
               <string>${BROADCAST_PROFILE_NAME}</string>
             </dict>
           </dict>

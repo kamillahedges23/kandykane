@@ -62,12 +62,12 @@ targets:
       - path: FrameBridge.swift
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: kandykane.broadcast
+        PRODUCT_BUNDLE_IDENTIFIER: kandykane.com.broadcast
         CODE_SIGN_STYLE: Manual
         CODE_SIGN_IDENTITY: "Apple Distribution"
         "CODE_SIGN_IDENTITY[sdk=iphoneos*]": "Apple Distribution"
         # Replaced by CI with the name inside the installed profile.
-        PROVISIONING_PROFILE_SPECIFIER: kandykane.broadcast
+        PROVISIONING_PROFILE_SPECIFIER: kandykane.com.broadcast
     info:
       path: Generated/KandyKaneBroadcast-Info.plist
       properties:
