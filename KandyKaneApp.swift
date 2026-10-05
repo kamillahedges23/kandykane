@@ -201,10 +201,13 @@ final class ScanEngine: ObservableObject {
     private func tick() async {
         guard !busy else { return }
         guard FrameBridge.hasNewFrame(since: lastSeen) else { return }
+        // Capture the timestamp before reading, so a frame written in between
+        // is picked up on the next tick instead of being marked as seen.
+        let frameTimestamp = FrameBridge.latestTimestamp
         guard let frame = FrameBridge.readLatest() else { return }
 
         busy = true
-        lastSeen = FrameBridge.latestTimestamp
+        lastSeen = frameTimestamp
         status = "Reading the screen"
         errorMessage = nil
 
