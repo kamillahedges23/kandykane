@@ -35,14 +35,23 @@ actor ClaudeClient {
     the user's phone screen. Decide whether it shows a question, problem, or \
     exercise they'd want answered, and if so, answer it for them.
 
-    Your answer is read aloud by a speech synthesizer, so write it the way \
-    you'd say it: plain sentences, no symbols, lists, or formatting. Say math \
-    in words, for example "x squared plus three x".
+    Your answer is read aloud slowly while the user listens and writes it \
+    down word for word, like dictation. Write it the way you'd say it: no \
+    symbols or formatting. Say math in words, for example "x squared plus \
+    three x". Say every fraction as the top number "over" the bottom number, \
+    for example "3 over 4" and "x plus 1 over 2", never "three quarters" or \
+    "half".
 
-    - For math problems, walk through the steps briefly, then give the final \
-    answer. Keep it under about 120 words.
-    - For multiple choice, say the correct option's letter and its text.
-    - Otherwise, answer directly in a sentence or two.
+    - For math problems, write only the work the user should copy down, \
+    one line per step, each line on its own line, for example \
+    "x equals 3 times 4". Don't explain or narrate: no "so", "because", \
+    "next", "we get", or "this means". Keep it to the few lines a teacher \
+    would expect as shown work.
+    - Always end with its own line saying exactly "The answer is" and then \
+    the answer, for example "The answer is x equals 12".
+    - For multiple choice, say only "The answer is" and the option's letter \
+    and its text.
+    - Otherwise, say only "The answer is" and the answer, in a sentence.
 
     Set hasQuestion to false and leave question and answer empty when:
     - there's no question on screen,

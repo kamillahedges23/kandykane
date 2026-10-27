@@ -20,6 +20,9 @@ final class BroadcastScanner: NSObject, AVSpeechSynthesizerDelegate {
     private var retryScheduled = false
     private var stopped = false
 
+    // Only touched on the main thread, where speech is started.
+    private var lastUtterance: AVSpeechUtterance?
+
     override init() {
         super.init()
         synth.delegate = self
@@ -130,11 +133,22 @@ final class BroadcastScanner: NSObject, AVSpeechSynthesizerDelegate {
         }
     }
 
+    // Each line is a separate utterance with a pause before it, so there's
+    // time to write one step down before the next is read.
     private func speak(_ text: String) {
-        let utterance = AVSpeechUtterance(string: text)
-        utterance.rate = AVSpeechUtteranceDefaultSpeechRate
-        utterance.voice = AVSpeechSynthesisVoice(language: "en-US")
-        synth.speak(utterance)
+        let lines = text.split(whereSeparator: \.isNewline)
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
+        lastUtterance = nil
+        for (index, line) in lines.enumerated() {
+            let utterance = AVSpeechUtterance(string: line)
+            utterance.rate = AVSpeechUtteranceDefaultSpeechRate * 0.8
+            utterance.voice = AVSpeechSynthesisVoice(language: "en-US")
+            if index > 0 { utterance.preUtteranceDelay = 1.5 }
+            lastUtterance = utterance
+            synth.speak(utterance)
+        }
+        if lastUtterance == nil { finishedSpeaking() }
     }
 
     private func finishedSpeaking() {
@@ -152,7 +166,10 @@ final class BroadcastScanner: NSObject, AVSpeechSynthesizerDelegate {
     }
 
     func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didFinish utterance: AVSpeechUtterance) {
-        finishedSpeaking()
+        DispatchQueue.main.async {
+            guard utterance === self.lastUtterance else { return }
+            self.finishedSpeaking()
+        }
     }
 
     func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didCancel utterance: AVSpeechUtterance) {
