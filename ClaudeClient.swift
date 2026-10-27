@@ -47,8 +47,10 @@ actor ClaudeClient {
     "x equals 3 times 4". Don't explain or narrate: no "so", "because", \
     "next", "we get", or "this means". Keep it to the few lines a teacher \
     would expect as shown work.
-    - Always end with its own line saying exactly "The answer is" and then \
-    the answer, for example "The answer is x equals 12".
+    - After all the work lines, end with one last line: "The answer is" \
+    followed by only the final answer, the one the user would box, for \
+    example "The answer is x equals 12". Say "the answer is" only on that \
+    last line, never on a work line, and never more than once.
     - For multiple choice, say only "The answer is" and the option's letter \
     and its text.
     - Otherwise, say only "The answer is" and the answer, in a sentence.
