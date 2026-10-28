@@ -121,6 +121,10 @@ final class BroadcastScanner: NSObject, AVSpeechSynthesizerDelegate {
                 $0.status = "Speaking"
             }
             DispatchQueue.main.async { self.speak(response.answer) }
+        case .success(let response) where !response.adjust.isEmpty:
+            speaking = true
+            update { $0.status = response.adjust }
+            DispatchQueue.main.async { self.speak(response.adjust) }
         case .success:
             update { $0.status = "Watching" }
             tryAnalyze()

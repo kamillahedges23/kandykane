@@ -4,8 +4,11 @@ struct ClaudeResponse {
     let hasQuestion: Bool
     let question: String
     let answer: String
+    // A spoken instruction for moving or steadying the camera when a question
+    // is only partly readable; empty otherwise.
+    let adjust: String
 
-    static let none = ClaudeResponse(hasQuestion: false, question: "", answer: "")
+    static let none = ClaudeResponse(hasQuestion: false, question: "", answer: "", adjust: "")
 }
 
 enum ClaudeError: LocalizedError {
@@ -61,6 +64,18 @@ actor ClaudeClient {
     a preview and a list of past answers), or
     - it's the same question as the previous one you were told about.
 
+    The screen is often a camera view of a paper or another screen. If you \
+    can see there's a question but can't read all of it, don't answer. \
+    Instead set hasQuestion to false, leave question and answer empty, and \
+    put one short spoken instruction in adjust:
+    - "Hold the camera still, it's blurry" if it's too blurry to read,
+    - "Move the camera up", "down", "left", or "right" if the question is \
+    cut off at that edge of the image (cut off at the top means move up),
+    - "Move the camera closer" if the text is too small to read, or "Move \
+    the camera back" if the question doesn't fit in the image.
+    Leave adjust empty in every other case, including when there's no \
+    question at all.
+
     In question, restate the question in a few words.
     """
 
@@ -69,9 +84,10 @@ actor ClaudeClient {
         "properties": [
             "hasQuestion": ["type": "boolean"],
             "question": ["type": "string"],
-            "answer": ["type": "string"]
+            "answer": ["type": "string"],
+            "adjust": ["type": "string"]
         ],
-        "required": ["hasQuestion", "question", "answer"],
+        "required": ["hasQuestion", "question", "answer", "adjust"],
         "additionalProperties": false
     ]
 
@@ -166,7 +182,8 @@ actor ClaudeClient {
         return ClaudeResponse(
             hasQuestion: parsed["hasQuestion"] as? Bool ?? false,
             question: parsed["question"] as? String ?? "",
-            answer: parsed["answer"] as? String ?? ""
+            answer: parsed["answer"] as? String ?? "",
+            adjust: parsed["adjust"] as? String ?? ""
         )
     }
 }
