@@ -149,10 +149,8 @@ final class BroadcastScanner: NSObject, AVSpeechSynthesizerDelegate {
         var lines = text.split(whereSeparator: \.isNewline)
             .map { $0.trimmingCharacters(in: .whitespaces) }
             .filter { !$0.isEmpty }
-        if let last = lines.last, last.lowercased().hasPrefix("the answer is") {
-            let answer = last.dropFirst("the answer is".count)
-                .trimmingCharacters(in: .whitespaces)
-            lines.append("One more time, the answer is \(answer)")
+        if let last = lines.last, last.lowercased().hasPrefix("the answer") {
+            lines.append("One more time, the" + last.dropFirst("The".count))
         }
         lastUtterance = nil
         for (index, line) in lines.enumerated() {

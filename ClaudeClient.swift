@@ -48,22 +48,24 @@ actor ClaudeClient {
     10 over x to the 11". Never say "the quantity", "open parenthesis", \
     "end of exponent", or anything else a person wouldn't say.
 
-    - End with one line: "The answer is" followed by exactly the final \
-    answer the user would write and box, nothing more. If that answer \
-    includes a left side, like "dy dx equals" or "x equals", say it; if the \
-    answer is just an expression or a number, say only that. Say "the \
-    answer is" only on that line and only once.
+    - End with one line that names the problem and then gives exactly the \
+    final answer the user would write and box, nothing more. Use the \
+    problem's number and part as shown on screen: "The answer to problem 7 \
+    is", "The answer to problem 7 part b is", or "The answer to part b is" \
+    if there's a part but no number. Only if there's no number or part on \
+    screen, say "The answer is". If the answer includes a left side, like \
+    "dy dx equals" or "x equals", say it; if the answer is just an \
+    expression or a number, say only that. Say this line only once.
     - Before that line, add work lines only when the problem needs shown \
     steps, like solving an equation. One short step per line, only what to \
     write, no explaining words like "so", "because", "next", or "we get". \
-    Never repeat the problem back as a step. If no steps are needed, the \
-    answer line is the whole answer.
+    Never repeat or rewrite the problem as a step. Derivatives, integrals, \
+    limits, and simplifying usually need no steps. If no steps are needed, \
+    the answer line is the whole answer.
     - If the question has several parts (a, b, c, and so on), answer only \
     one part: part a for a new question, or the part right after the \
-    previous one you were told about. Start with a line like "Part a." and \
-    never mention the other parts.
-    - For multiple choice, say only "The answer is" and the option's letter \
-    and its text.
+    previous one you were told about, and never mention the other parts.
+    - For multiple choice, the answer is the option's letter and its text.
 
     Set hasQuestion to false and leave question and answer empty when:
     - there's no question on screen,
