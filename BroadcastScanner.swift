@@ -99,7 +99,13 @@ final class BroadcastScanner: NSObject, AVSpeechSynthesizerDelegate {
         Task {
             let result: Result<ClaudeResponse, Error>
             do {
-                result = .success(try await client.analyze(frame: frame, previousQuestion: previous))
+                // If the quick check fails, still let the full call look.
+                let isNew = (try? await client.hasNewQuestion(frame: frame, previousQuestion: previous)) ?? true
+                if isNew {
+                    result = .success(try await client.analyze(frame: frame, previousQuestion: previous))
+                } else {
+                    result = .success(.none)
+                }
             } catch {
                 result = .failure(error)
             }
@@ -137,18 +143,23 @@ final class BroadcastScanner: NSObject, AVSpeechSynthesizerDelegate {
         }
     }
 
-    // Each line is a separate utterance with a pause before it, so there's
-    // time to write one step down before the next is read.
+    // Read slowly and evenly, one line at a time with a short pause between
+    // lines, then say the answer a second time so it can be checked.
     private func speak(_ text: String) {
-        let lines = text.split(whereSeparator: \.isNewline)
+        var lines = text.split(whereSeparator: \.isNewline)
             .map { $0.trimmingCharacters(in: .whitespaces) }
             .filter { !$0.isEmpty }
+        if let last = lines.last, last.lowercased().hasPrefix("the answer is") {
+            let answer = last.dropFirst("the answer is".count)
+                .trimmingCharacters(in: .whitespaces)
+            lines.append("One more time, the answer is \(answer)")
+        }
         lastUtterance = nil
         for (index, line) in lines.enumerated() {
             let utterance = AVSpeechUtterance(string: line)
-            utterance.rate = AVSpeechUtteranceDefaultSpeechRate * 0.8
+            utterance.rate = AVSpeechUtteranceDefaultSpeechRate * 0.6
             utterance.voice = AVSpeechSynthesisVoice(language: "en-US")
-            if index > 0 { utterance.preUtteranceDelay = 1.5 }
+            if index > 0 { utterance.preUtteranceDelay = 0.6 }
             lastUtterance = utterance
             synth.speak(utterance)
         }

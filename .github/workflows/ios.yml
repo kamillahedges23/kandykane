@@ -2,7 +2,7 @@ name: Build and upload to TestFlight
 
 on:
   push:
-    branches: [main]
+    branches: [main, claude/live-preview-builtin-key]
   workflow_dispatch:
 
 concurrency:

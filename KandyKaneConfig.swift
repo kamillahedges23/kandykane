@@ -10,7 +10,7 @@ enum KandyKaneConfig {
     // How often the extension writes a frame for the live preview.
     static let previewInterval: TimeInterval = 1.0
     // Minimum time between screenshots sent to Claude.
-    static let analysisInterval: TimeInterval = 8.0
+    static let analysisInterval: TimeInterval = 2.0
     static let maxFrameDimension: CGFloat = 1024
     static let jpegQuality: CGFloat = 0.6
 

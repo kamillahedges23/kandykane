@@ -39,30 +39,38 @@ actor ClaudeClient {
     exercise they'd want answered, and if so, answer it for them.
 
     Your answer is read aloud slowly while the user listens and writes it \
-    down word for word, like dictation. Write it the way you'd say it: no \
-    symbols or formatting. Say math in words, for example "x squared plus \
-    three x". Say every fraction as the top number "over" the bottom number, \
-    for example "3 over 4" and "x plus 1 over 2", never "three quarters" or \
-    "half".
+    down. Say it the way a person would say it out loud to a friend who's \
+    writing it down: short, plain, natural. No symbols or formatting. Say \
+    math in words, for example "x squared plus 3 x". Say every fraction as \
+    the top "over" the bottom, for example "1 over 10" and "10 over x to the \
+    11", never "one tenth" or "half". Use commas to split a long answer into \
+    pieces, for example "1 over 10 to the x, times log of 1 over 10, minus \
+    10 over x to the 11". Never say "the quantity", "open parenthesis", \
+    "end of exponent", or anything else a person wouldn't say.
 
-    - For math problems, write only the work the user should copy down, \
-    one line per step, each line on its own line, for example \
-    "x equals 3 times 4". Don't explain or narrate: no "so", "because", \
-    "next", "we get", or "this means". Keep it to the few lines a teacher \
-    would expect as shown work.
-    - After all the work lines, end with one last line: "The answer is" \
-    followed by only the final answer, the one the user would box, for \
-    example "The answer is x equals 12". Say "the answer is" only on that \
-    last line, never on a work line, and never more than once.
+    - End with one line: "The answer is" followed by exactly the final \
+    answer the user would write and box, nothing more. If that answer \
+    includes a left side, like "dy dx equals" or "x equals", say it; if the \
+    answer is just an expression or a number, say only that. Say "the \
+    answer is" only on that line and only once.
+    - Before that line, add work lines only when the problem needs shown \
+    steps, like solving an equation. One short step per line, only what to \
+    write, no explaining words like "so", "because", "next", or "we get". \
+    Never repeat the problem back as a step. If no steps are needed, the \
+    answer line is the whole answer.
+    - If the question has several parts (a, b, c, and so on), answer only \
+    one part: part a for a new question, or the part right after the \
+    previous one you were told about. Start with a line like "Part a." and \
+    never mention the other parts.
     - For multiple choice, say only "The answer is" and the option's letter \
     and its text.
-    - Otherwise, say only "The answer is" and the answer, in a sentence.
 
     Set hasQuestion to false and leave question and answer empty when:
     - there's no question on screen,
     - the screen shows this app itself (a black screen titled KandyKane with \
     a preview and a list of past answers), or
-    - it's the same question as the previous one you were told about.
+    - it's the same question as the previous one you were told about and \
+    it has no parts left to answer.
 
     The screen is often a camera view of a paper or another screen. If you \
     can see there's a question but can't read all of it, don't answer. \
@@ -76,7 +84,8 @@ actor ClaudeClient {
     Leave adjust empty in every other case, including when there's no \
     question at all.
 
-    In question, restate the question in a few words.
+    In question, restate the question in a few words and add the part you \
+    answered, for example "derivative of sine of x, part b".
     """
 
     private let schema: [String: Any] = [
@@ -91,22 +100,50 @@ actor ClaudeClient {
         "additionalProperties": false
     ]
 
+    // A quick, cheap look at each screenshot so the slower answering call
+    // only runs when there's something new to answer.
+    private let quickModel = "claude-haiku-5-5"
+
+    private let quickPrompt = """
+    Each request is a screenshot of a phone screen, often a camera view of \
+    a paper or another screen. Set newQuestion to true if it shows a \
+    question, problem, or exercise that hasn't been answered yet, even if \
+    it's blurry or cut off. That includes a later part (b, c, and so on) of \
+    the previous question when the previous answer covered an earlier part. \
+    Set it to false if there's no question, if it's the same question and \
+    part as the previous one with no parts left, or if the screen is a \
+    black screen titled KandyKane. If you're unsure, set it to true.
+    """
+
+    private let quickSchema: [String: Any] = [
+        "type": "object",
+        "properties": ["newQuestion": ["type": "boolean"]],
+        "required": ["newQuestion"],
+        "additionalProperties": false
+    ]
+
+    // Returns false only when the screen clearly has nothing new to answer.
+    func hasNewQuestion(frame jpegData: Data, previousQuestion: String) async throws -> Bool {
+        let body: [String: Any] = [
+            "model": quickModel,
+            "max_tokens": 200,
+            // Thinking off and low effort keep this check fast.
+            "thinking": ["type": "disabled"],
+            "output_config": [
+                "effort": "low",
+                "format": ["type": "json_schema", "schema": quickSchema]
+            ],
+            "system": quickPrompt,
+            "messages": [message(frame: jpegData, previousQuestion: previousQuestion)]
+        ]
+
+        let data = try await send(body, beta: nil)
+        // Leave it to the main call when the quick one declines.
+        guard let parsed = try parseJSON(data) else { return true }
+        return parsed["newQuestion"] as? Bool ?? true
+    }
+
     func analyze(frame jpegData: Data, previousQuestion: String) async throws -> ClaudeResponse {
-        let key = KandyKaneConfig.anthropicAPIKey
-        guard !key.isEmpty else { throw ClaudeError.missingKey }
-
-        var request = URLRequest(url: endpoint)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue(key, forHTTPHeaderField: "x-api-key")
-        request.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
-        request.setValue("server-side-fallback-2026-07-01", forHTTPHeaderField: "anthropic-beta")
-        request.timeoutInterval = 90
-
-        let previous = previousQuestion.isEmpty
-            ? "No question has been answered yet."
-            : "The previous question was: \(previousQuestion)"
-
         let body: [String: Any] = [
             "model": model,
             // Thinking is always on for this model and counts toward
@@ -119,25 +156,57 @@ actor ClaudeClient {
             ],
             "fallbacks": "default",
             "system": systemPrompt,
-            "messages": [[
-                "role": "user",
-                "content": [
-                    [
-                        "type": "image",
-                        "source": [
-                            "type": "base64",
-                            "media_type": "image/jpeg",
-                            "data": jpegData.base64EncodedString()
-                        ]
-                    ],
-                    [
-                        "type": "text",
-                        "text": "\(previous)\nIs there a new question on this screen?"
-                    ]
-                ]
-            ]]
+            "messages": [message(frame: jpegData, previousQuestion: previousQuestion)]
         ]
 
+        let data = try await send(body, beta: "server-side-fallback-2026-07-01")
+        // A declined screenshot is treated like one without a question.
+        guard let parsed = try parseJSON(data) else { return .none }
+
+        return ClaudeResponse(
+            hasQuestion: parsed["hasQuestion"] as? Bool ?? false,
+            question: parsed["question"] as? String ?? "",
+            answer: parsed["answer"] as? String ?? "",
+            adjust: parsed["adjust"] as? String ?? ""
+        )
+    }
+
+    private func message(frame jpegData: Data, previousQuestion: String) -> [String: Any] {
+        let previous = previousQuestion.isEmpty
+            ? "No question has been answered yet."
+            : "The previous question was: \(previousQuestion)"
+        return [
+            "role": "user",
+            "content": [
+                [
+                    "type": "image",
+                    "source": [
+                        "type": "base64",
+                        "media_type": "image/jpeg",
+                        "data": jpegData.base64EncodedString()
+                    ]
+                ],
+                [
+                    "type": "text",
+                    "text": "\(previous)\nIs there a new question on this screen?"
+                ]
+            ]
+        ]
+    }
+
+    private func send(_ body: [String: Any], beta: String?) async throws -> Data {
+        let key = KandyKaneConfig.anthropicAPIKey
+        guard !key.isEmpty else { throw ClaudeError.missingKey }
+
+        var request = URLRequest(url: endpoint)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue(key, forHTTPHeaderField: "x-api-key")
+        request.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
+        if let beta {
+            request.setValue(beta, forHTTPHeaderField: "anthropic-beta")
+        }
+        request.timeoutInterval = 90
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
         let (data, response) = try await URLSession.shared.data(for: request)
@@ -150,11 +219,11 @@ actor ClaudeClient {
                 .flatMap { $0["error"] as? [String: Any] }?["message"] as? String
             throw ClaudeError.badResponse(http.statusCode, apiError)
         }
-
-        return try parse(data)
+        return data
     }
 
-    private func parse(_ data: Data) throws -> ClaudeResponse {
+    // The structured JSON the model returned, or nil if it declined.
+    private func parseJSON(_ data: Data) throws -> [String: Any]? {
         guard
             let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
             let content = root["content"] as? [[String: Any]]
@@ -162,9 +231,8 @@ actor ClaudeClient {
             throw ClaudeError.decodingFailed
         }
 
-        // A declined screenshot is treated like one without a question.
         if root["stop_reason"] as? String == "refusal" {
-            return .none
+            return nil
         }
 
         let text = content
@@ -178,12 +246,6 @@ actor ClaudeClient {
         else {
             throw ClaudeError.decodingFailed
         }
-
-        return ClaudeResponse(
-            hasQuestion: parsed["hasQuestion"] as? Bool ?? false,
-            question: parsed["question"] as? String ?? "",
-            answer: parsed["answer"] as? String ?? "",
-            adjust: parsed["adjust"] as? String ?? ""
-        )
+        return parsed
     }
 }
